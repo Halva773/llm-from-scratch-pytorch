@@ -7,7 +7,8 @@ class BPE:
         unique_symbols = self._get_unique_symbols(text)
         self.tokens.extend(unique_symbols)
         self._fitting(text)
-
+        self.__create_id2token()
+        self.__create_token2id()
 
     def _get_unique_symbols(self, text):
         unique_symbols = list(set(text))
@@ -26,8 +27,6 @@ class BPE:
                     popular_pairs.add(key)
             body_text, pair = self._replace_most_popular_pair(body_text, pairs=popular_pairs)
             self.tokens.append(pair)
-
-            print(len(self.tokens))
         
     def _count_pairs(self, body_text: list):
         pairs = {}
@@ -45,6 +44,7 @@ class BPE:
                 pair = current_pair
                 body_text[i] = pair
                 body_text.pop(i+1)
+                break
             i += 1
         while i < len(body_text) - 1:
             current_pair = ''.join(body_text[i:i+2])
@@ -53,13 +53,28 @@ class BPE:
                 body_text.pop(i+1)
             i += 1
         return body_text, pair
+    
+    def __create_id2token(self):
+        self.id2token = {i: token for i, token in enumerate(self.tokens)}
+
+    def __create_token2id(self):
+        self.token2id = {token: i for i, token in enumerate(self.tokens)}
 
 
 
 if __name__ == "__main__":
-    bpe = BPE(vocab_size=30)
-    sample_text = "This is a sample text for BPE tokenization."
-    bpe.fit(sample_text)
 
-    print(bpe.tokens)
+
+    
+    bpe = BPE(vocab_size=30)
+    sample_text = "Из кузова в кузов шла перегрузка арбузов. В грозу в грязи от груза арбузов развалился кузов."
+    bpe.fit(sample_text)
+    assert bpe.tokens == [' ','.','В','И','а','б','в','г','е','з','и','к','л','о','п','р','с','т','у','ш','я','уз','узо','узов','а ','гр',' к',' кузов',' гр','а а']
+
+
+    bpe = BPE(vocab_size=31)
+    sample_text = "Однажды был случай в далёком Макао: макака коалу в какао макала, коала лениво какао лакала, макака макала, коала икала."
+    bpe.fit(sample_text)
+    assert bpe.tokens == [' ',',','.',':','М','О','а','б','в','д','е','ж','и','й','к','л','м','н','о','с','у','ч','ы','ё','ка','ла','ака','ко',' м',' мака',' ко']
+    print("All tests passed.")
 
