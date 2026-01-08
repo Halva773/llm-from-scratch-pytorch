@@ -16,15 +16,19 @@ class BPE:
     
     def _fitting(self, text):
         body_text = list(text)
-        pairs = self._count_pairs(body_text)
 
-        for key, value in pairs.items():
-            if value == max(pairs.values()):
-                print(key, value)
-        # print(pairs)
+        while (len(self.tokens) < self.vocab_size) and (len(body_text) != 1):
+            pairs = self._count_pairs(body_text)
 
-        # print(dict(sorted(pairs.items(), key=lambda x: x[1], reverse=True)))
+            popular_pairs = set()
+            for key, value in pairs.items():
+                if value == max(pairs.values()):
+                    popular_pairs.add(key)
+            body_text, pair = self._replace_most_popular_pair(body_text, pairs=popular_pairs)
+            self.tokens.append(pair)
 
+            print(len(self.tokens))
+        
     def _count_pairs(self, body_text: list):
         pairs = {}
         for i in range(len(body_text) - 1):
@@ -32,22 +36,30 @@ class BPE:
             pairs[pair] = pairs.get(pair, 0) + 1
         return pairs
 
-    def _replace_most_popular_pair(self, body_text: list, pair: str):
+    def _replace_most_popular_pair(self, body_text: list, pairs: set):
         i = 0
+        pair = None
         while i < len(body_text) - 1:
             current_pair = ''.join(body_text[i:i+2])
-            print(current_pair)
+            if (pair is None) and (current_pair in pairs):
+                pair = current_pair
+                body_text[i] = pair
+                body_text.pop(i+1)
+            i += 1
+        while i < len(body_text) - 1:
+            current_pair = ''.join(body_text[i:i+2])
             if pair == current_pair:
                 body_text[i] = pair
                 body_text.pop(i+1)
             i += 1
-        return body_text
+        return body_text, pair
 
 
 
 if __name__ == "__main__":
-    bpe = BPE(vocab_size=1000)
+    bpe = BPE(vocab_size=30)
     sample_text = "This is a sample text for BPE tokenization."
     bpe.fit(sample_text)
-    # print(bpe.tokens)
+
+    print(bpe.tokens)
 
