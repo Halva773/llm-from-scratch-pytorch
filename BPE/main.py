@@ -113,7 +113,8 @@ class BPE:
 
         return ids
     
-
+    def decode(self, token_ids: list[int]):
+        return "".join([self.id2token[i] for i in token_ids])
     
 
 
