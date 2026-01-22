@@ -1,3 +1,6 @@
+import dill
+
+
 class BPE:
     def __init__(self, vocab_size: int):
         self.vocab_size = vocab_size
@@ -116,14 +119,31 @@ class BPE:
     def decode(self, token_ids: list[int]):
         return "".join([self.id2token[i] for i in token_ids])
     
+    def save(self, filename):
+        with open(filename, 'wb') as f:
+            dill.dump(self, f)
+        print(f"Объект сохранён в {filename}")
+
+
+    @classmethod
+    def load(cls, filename):
+        with open(filename, 'rb') as f:
+            obj = dill.load(f)
+                
+        print(f"Объект загружен из {filename}")
+        return obj
+    
 
 
 if __name__ == "__main__":
     bpe = BPE(vocab_size=30)
     sample_text = "This is a sample text for BPE tokenization."
     bpe.fit(sample_text)
-
     tokens = bpe.encode('sample text')
     print(tokens)
-    decoded = bpe.decode(tokens)
+
+    bpe.save('data/bpe.dill')
+
+    loaded_bpe = BPE.load('data/bpe.dill')
+    decoded = loaded_bpe.decode(tokens)
     print(decoded)
