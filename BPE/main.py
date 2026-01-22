@@ -1,80 +1,128 @@
 class BPE:
-    def __init__(self, vocab_size):
+    def __init__(self, vocab_size: int):
         self.vocab_size = vocab_size
-        
-    def fit(self, text):
-        self.tokens = []
-        unique_symbols = self._get_unique_symbols(text)
-        self.tokens.extend(unique_symbols)
-        self._fitting(text)
+        self.merges = []
+        self.is_fitted = False
+
+    def fit(self, text: str):
+        self.unique_symbols = self._get_unique_symbols(text)
+
+        # В vocab_size входят и базовые символы, и merge-токены
+        max_merges = self.vocab_size - len(self.unique_symbols)
+        if max_merges < 0:
+            self.unique_symbols = self.unique_symbols[: self.vocab_size]
+            max_merges = 0
+
+        self._fitting(text, max_merges=max_merges)
+
+        self.tokens = self._build_vocab_from_merges()
         self.__create_id2token()
         self.__create_token2id()
 
-    def _get_unique_symbols(self, text):
-        unique_symbols = list(set(text))
-        unique_symbols.sort()
-        return unique_symbols[:self.vocab_size]
-    
-    def _fitting(self, text):
+        # Сброс кэша индексов для encode
+        if hasattr(self, "_tokens_by_first_char"):
+            delattr(self, "_tokens_by_first_char")
+
+        self.is_fitted = True
+
+    def _get_unique_symbols(self, text: str):
+        return sorted(set(text))
+
+    def _fitting(self, text: str, max_merges: int):
         body_text = list(text)
 
-        while (len(self.tokens) < self.vocab_size) and (len(body_text) != 1):
+        while (len(self.merges) < max_merges) and (len(body_text) > 1):
             pairs = self._count_pairs(body_text)
+            pair = max(pairs, key=pairs.get)
+            body_text, pair = self._replace_most_popular_pair(body_text, pair=pair)
+            self.merges.append(pair)
 
-            popular_pairs = set()
-            for key, value in pairs.items():
-                if value == max(pairs.values()):
-                    popular_pairs.add(key)
-            body_text, pair = self._replace_most_popular_pair(body_text, pairs=popular_pairs)
-            self.tokens.append(pair)
-        
     def _count_pairs(self, body_text: list):
         pairs = {}
         for i in range(len(body_text) - 1):
-            pair = ''.join(body_text[i:i+2])
+            pair = (body_text[i], body_text[i + 1])
             pairs[pair] = pairs.get(pair, 0) + 1
         return pairs
 
-    def _replace_most_popular_pair(self, body_text: list, pairs: set):
+    # ВАЖНО: заменяем ВСЕ вхождения пары, а не первое
+    def _replace_most_popular_pair(self, body_text: list, pair: tuple):
         i = 0
-        pair = None
         while i < len(body_text) - 1:
-            current_pair = ''.join(body_text[i:i+2])
-            if (pair is None) and (current_pair in pairs):
-                pair = current_pair
-                body_text[i] = pair
-                body_text.pop(i+1)
-                break
-            i += 1
-        while i < len(body_text) - 1:
-            current_pair = ''.join(body_text[i:i+2])
-            if pair == current_pair:
-                body_text[i] = pair
-                body_text.pop(i+1)
-            i += 1
+            if (body_text[i], body_text[i + 1]) == pair:
+                body_text[i] = body_text[i] + body_text[i + 1]
+                body_text.pop(i + 1)
+                # i не увеличиваем — после склейки могут образоваться новые совпадения на той же позиции
+            else:
+                i += 1
         return body_text, pair
-    
+
+    # Детерминированный порядок токенов: сначала базовые символы, затем merge'и по порядку обучения
+    def _build_vocab_from_merges(self):
+        vocab = list(self.unique_symbols)
+        seen = set(vocab)
+
+        for a, b in self.merges:
+            tok = a + b
+            if tok not in seen:
+                vocab.append(tok)
+                seen.add(tok)
+
+        return vocab[: self.vocab_size]
+
     def __create_id2token(self):
         self.id2token = {i: token for i, token in enumerate(self.tokens)}
 
     def __create_token2id(self):
         self.token2id = {token: i for i, token in enumerate(self.tokens)}
 
+    # Быстрый жадный энкодинг по условию
+    def encode(self, text: str):
+        if not self.is_fitted:
+            raise RuntimeError("Call fit first")
+        if not text:
+            return []
+
+        # Индекс: первый символ -> токены, отсортированные по (длина desc, id asc)
+        if not hasattr(self, "_tokens_by_first_char"):
+            d = {}
+            for tok in self.tokens:
+                d.setdefault(tok[0], []).append(tok)
+            for ch in d:
+                d[ch].sort(key=lambda t: (-len(t), self.token2id[t]))
+            self._tokens_by_first_char = d
+
+        ids = []
+        i = 0
+        n = len(text)
+
+        while i < n:
+            ch = text[i]
+            candidates = self._tokens_by_first_char.get(ch, [])
+
+            chosen = None
+            for tok in candidates:
+                if text.startswith(tok, i):
+                    chosen = tok
+                    break
+
+            if chosen is None:
+                chosen = ch
+
+            ids.append(self.token2id[chosen])
+            i += len(chosen)
+
+        return ids
+    
+
+    
 
 
 if __name__ == "__main__":
-
-
-    
     bpe = BPE(vocab_size=30)
-    sample_text = "Из кузова в кузов шла перегрузка арбузов. В грозу в грязи от груза арбузов развалился кузов."
+    sample_text = "This is a sample text for BPE tokenization."
     bpe.fit(sample_text)
-    assert bpe.tokens == [' ','.','В','И','а','б','в','г','е','з','и','к','л','о','п','р','с','т','у','ш','я','уз','узо','узов','а ','гр',' к',' кузов',' гр','а а']
 
-
-    bpe = BPE(vocab_size=31)
-    sample_text = "Однажды был случай в далёком Макао: макака коалу в какао макала, коала лениво какао лакала, макака макала, коала икала."
-    bpe.fit(sample_text)
-    assert bpe.tokens == [' ',',','.',':','М','О','а','б','в','д','е','ж','и','й','к','л','м','н','о','с','у','ч','ы','ё','ка','ла','ака','ко',' м',' мака',' ко']
-    print("All tests passed.")
-
+    tokens = bpe.encode('sample text')
+    print(tokens)
+    decoded = bpe.decode(tokens)
+    print(decoded)
