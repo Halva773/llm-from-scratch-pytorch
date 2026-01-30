@@ -9,7 +9,7 @@ class HeadAttention(nn.Module):
         self.Wq = nn.Linear(emb_size, head_size)
         self.Wv = nn.Linear(emb_size, head_size)
 
-        self.mask = torch.tril(torch.randn(max_seq_len, max_seq_len), diagonal=0)
+        self.mask = torch.tril(torch.ones(max_seq_len, max_seq_len))
 
 
     def forward(self, x: torch.Tensor):
@@ -25,7 +25,6 @@ class HeadAttention(nn.Module):
         V = self.Wv(x)
 
         attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
-
         mask = self.mask[:K.size(1), :K.size(1)]
 
         attn_weights = attn_weights.masked_fill(mask == 0, float('-inf'))
@@ -34,13 +33,31 @@ class HeadAttention(nn.Module):
         return out
 
 
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: float = 0.1):
+        super().__init__()
+        self.heads = nn.ModuleList([HeadAttention(emb_size, head_size, max_seq_len) for _ in range(num_heads)])
+        self.linear = nn.Linear(num_heads * head_size, emb_size)
+        self.dropout = nn.Dropout(dropout)
+
+
+    def forward(self, x: torch.Tensor):
+        heads_out = [head(x) for head in self.heads]
+        O = torch.cat(heads_out, dim=-1)
+        O = self.linear(O)
+        O = self.dropout(O)
+        return O
+
+
 if __name__ == "__main__":
     emb_size = 128
-    head_size = 64
-    max_seq_len = 10
+    head_size = 32
+    max_seq_len = 512
+    num_heads = 8
 
     x = torch.randn(2, max_seq_len, emb_size)  # batch_size x seq_len x emb_size
 
-    model = HeadAttention(emb_size=emb_size, head_size=head_size, max_seq_len=max_seq_len)
+    model = MultiHeadAttention(num_heads=num_heads, emb_size=emb_size, head_size=head_size, max_seq_len=max_seq_len)
     out = model.forward(x)
     print(out.shape)  # Expected output shape: (2, max_seq_len, head_size)
