@@ -9,6 +9,18 @@ class TokenEmbeddings(nn.Module):
 
     def forward(self, x: torch.Tensor):
         return self.embedding(x)
+    
+
+
+class PositionalEmbeddings(nn.Module):
+    def __init__(self, max_seq_size, emb_size):
+        super().__init__()
+        self.pos_embedding = nn.Embedding(max_seq_size, emb_size)
+
+    def forward(self, seq_len: int):
+        positions = torch.arange(0, seq_len)
+        return self.pos_embedding(positions)
+        
 
         
 if __name__ == "__main__":
@@ -20,6 +32,6 @@ if __name__ == "__main__":
                         [345, 678, 454, 546]
                     ])
 
-    model = TokenEmbeddings(vocab_size=1000, emb_size=128)
-    out = model(x)
-    print(out.shape)
+    model = PositionalEmbeddings(max_seq_size=1000, emb_size=6)
+    out = model(seq_len=4)
+    print(out, out.shape)
