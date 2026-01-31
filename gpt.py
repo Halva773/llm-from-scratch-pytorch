@@ -17,6 +17,7 @@ class GPT(nn.Module):
                 device: str = 'cpu'
                 ):
         super().__init__()
+        self.max_seq_len = max_seq_len
         
         self.tokenEmbedings = TokenEmbeddings(vocab_size, emb_size)
         self.positionalEmbeddings = PositionalEmbeddings(max_seq_len, emb_size)
@@ -39,6 +40,20 @@ class GPT(nn.Module):
             out = decoder(out)
         out = self.linear(out)
         return out
+    
+    def generate(self, x: torch.Tensor, max_new_tokens: int):
+        for _ in range(max_new_tokens):
+            O = x[:, -self.max_seq_len:]
+            logit = self.forward(O)
+            # Get the last token's logits
+            logits = logit[:, -1, :]
+            # Sample from the distribution
+            probs = torch.softmax(logits, dim=-1)
+            next_token = torch.argmax(probs, dim=-1, keepdim=True)
+            x = torch.cat([x, next_token], dim=1)
+        return x
+
+
 
 
 
@@ -63,5 +78,5 @@ if __name__ == "__main__":
                     [113, 456, 76, 345],
                     [345, 678, 454, 546]
                 ])
-    out = gpt(x)
+    out = gpt.generate(x, max_new_tokens=10)
     print(out, out.shape)

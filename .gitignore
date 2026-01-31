@@ -21,3 +21,5 @@ temp
 *.sqlite3
 *.db
 *.class
+
+*__pycache__*/
