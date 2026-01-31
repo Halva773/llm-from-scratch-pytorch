@@ -17,16 +17,23 @@ class GPT(nn.Module):
                 device: str = 'cpu'
                 ):
         super().__init__()
+        self.vocab_size = vocab_size
         self.max_seq_len = max_seq_len
+        self.emb_size = emb_size
+        self.num_heads = num_heads
+        self.head_size = head_size
+        self.num_layers = num_layers
+        self.dropout_float = dropout
+        self.device = device
         
-        self.tokenEmbedings = TokenEmbeddings(vocab_size, emb_size)
-        self.positionalEmbeddings = PositionalEmbeddings(max_seq_len, emb_size)
-        self.dropout = nn.Dropout(dropout)
+        self.tokenEmbedings = TokenEmbeddings(self.vocab_size, self.emb_size)
+        self.positionalEmbeddings = PositionalEmbeddings(self.max_seq_len, self.emb_size)
+        self.dropout = nn.Dropout(self.dropout_float)
         self.decoders = nn.ModuleList([
-                Decoder(num_heads, emb_size, head_size, max_seq_len, dropout) 
-                for _ in range(num_layers)
+                Decoder(self.num_heads, self.emb_size, self.head_size, self.max_seq_len, self.dropout_float) 
+                for _ in range(self.num_layers)
             ])
-        self.linear = nn.Linear(emb_size, vocab_size)
+        self.linear = nn.Linear(self.emb_size, self.vocab_size)
 
     def forward(self, x: torch.Tensor):
         B, T = x.shape
@@ -41,16 +48,63 @@ class GPT(nn.Module):
         out = self.linear(out)
         return out
     
-    def generate(self, x: torch.Tensor, max_new_tokens: int):
+    def generate(   
+                    self, 
+                    x: torch.Tensor,
+                    max_new_tokens: int,
+                    do_sample: bool = False,
+                    temperature: float = 1.0,
+                    top_k: int = None,
+                    top_p: float = None
+                ):
+        
+        
+        
         for _ in range(max_new_tokens):
             O = x[:, -self.max_seq_len:]
             logit = self.forward(O)
             # Get the last token's logits
             logits = logit[:, -1, :]
-            # Sample from the distribution
+            # Scale logits by temperature
+            logits = logits / temperature
+
+            if do_sample and top_k is not None:
+                values, _ = torch.topk(logits, top_k, dim=-1)
+                min_topk = values[:, -1].unsqueeze(-1)
+                logits = torch.where(
+                    logits < min_topk,
+                    torch.full_like(logits, -float("inf")),
+                    logits
+                )
+
+            if do_sample and top_p is not None:
+                probs = torch.softmax(logits, dim=-1)
+                sorted_probs, sorted_idx = torch.sort(probs, descending=True, dim=-1)
+                cum_probs = torch.cumsum(sorted_probs, dim=-1)
+
+                keep = cum_probs <= top_p
+                keep[..., 0] = 1 
+
+                mask = torch.full_like(logits, -float("inf"))
+                mask.scatter_(
+                    dim=-1,
+                    index=sorted_idx,
+                    src=torch.where(
+                        keep,
+                        logits.gather(-1, sorted_idx),
+                        torch.full_like(sorted_probs, -float("inf"))
+                    )
+                )
+                logits = mask
+
             probs = torch.softmax(logits, dim=-1)
-            next_token = torch.argmax(probs, dim=-1, keepdim=True)
+
+            if do_sample:
+                next_token = torch.multinomial(probs, num_samples=1)
+            else:
+                next_token = torch.argmax(probs, dim=-1, keepdim=True)
             x = torch.cat([x, next_token], dim=1)
+            
         return x
 
 
@@ -105,7 +159,7 @@ if __name__ == "__main__":
                     [345, 678, 454, 546]
                 ])
     out = gpt.generate(x, max_new_tokens=10)
-    gpt.save("gpt_model.pth")
+    gpt.save("data/gpt_model.pth")
 
-    gpt = GPT.load(save_path, device=device)
+    gpt = GPT.load("data/gpt_model.pth", device=device)
     print(out, out.shape)
