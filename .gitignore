@@ -4,3 +4,20 @@
 test.py
 
 data
+
+*.pyc
+__pycache__/
+.DS_Store
+.vscode
+.env
+logs
+output
+*.log
+models
+checkpoint
+runs
+.ipynb_checkpoints
+temp
+*.sqlite3
+*.db
+*.class
