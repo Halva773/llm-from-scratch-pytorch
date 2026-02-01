@@ -25,5 +25,5 @@ temp
 *__pycache__*/
 *.pth
 
-src/savepoints
+*savepoints
 dataset/
