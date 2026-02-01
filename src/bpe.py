@@ -10,6 +10,8 @@ class BPE:
     def fit(self, text: str):
         self.unique_symbols = self._get_unique_symbols(text)
 
+        print(unique_symbols)
+
         # В vocab_size входят и базовые символы, и merge-токены
         max_merges = self.vocab_size - len(self.unique_symbols)
         if max_merges < 0:
@@ -35,6 +37,9 @@ class BPE:
         body_text = list(text)
 
         while (len(self.merges) < max_merges) and (len(body_text) > 1):
+            if len(self.merges) % (max_merges//10) == 0:
+                print(f"Обучено {len(self.merges)} токенов")
+
             pairs = self._count_pairs(body_text)
             pair = max(pairs, key=pairs.get)
             body_text, pair = self._replace_most_popular_pair(body_text, pair=pair)
@@ -136,14 +141,8 @@ class BPE:
 
 
 if __name__ == "__main__":
-    bpe = BPE(vocab_size=30)
+    bpe = BPE(vocab_size=4000)
     sample_text = "This is a sample text for BPE tokenization."
     bpe.fit(sample_text)
     tokens = bpe.encode('sample text')
     print(tokens)
-
-    bpe.save('data/bpe.dill')
-
-    loaded_bpe = BPE.load('data/bpe.dill')
-    decoded = loaded_bpe.decode(tokens)
-    print(decoded)
