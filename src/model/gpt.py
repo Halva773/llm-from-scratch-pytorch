@@ -3,6 +3,7 @@ import torch
 
 from embedings import TokenEmbeddings, PositionalEmbeddings
 from decoder import Decoder
+from dataLoader import DataLoader
 
 
 class GPT(nn.Module):
@@ -119,6 +120,52 @@ class GPT(nn.Module):
             'num_layers': self.num_layers
         }, path)
     
+
+    def fit(self, train_loader: DataLoader, valid_loader: DataLoader, num_epochs: int, learning_rate: float):
+        device = torch.device(self.device) if isinstance(self.device, str) else self.device
+        self.to(device)        
+
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        self.losses = [{'train': [], 'valid': []}]
+        cross_entropy = nn.CrossEntropyLoss()
+        
+        for epoch in range(num_epochs):
+            self.train()
+            for x, y in train_loader:
+                x = x.to(self.device)
+                y = y.to(self.device)
+                logits = self(x)
+                targets = y
+                B, T, V = logits.shape
+                
+                logits_flat = logits.view(B * T, V)
+                targets_flat = targets.view(B * T)
+
+                train_loss = cross_entropy(logits_flat, targets_flat)
+                self.losses[0]['train'].append(train_loss.item())
+
+                optimizer.zero_grad()
+                train_loss.backward()
+                optimizer.step()
+
+            self.eval()
+            with torch.no_grad():
+                for x, y in valid_loader:
+                    x = x.to(self.device)
+                    y = y.to(self.device)
+                    logits = self(x)
+                    targets = y
+
+                    B, T, V = logits.shape
+                    logits_flat = logits.view(B * T, V)
+                    targets_flat = targets.view(B * T)
+
+                    loss = cross_entropy(logits_flat, targets_flat)
+                    self.losses[0]['valid'].append(loss.item())
+            print(f"Epoch {epoch + 1}/{num_epochs} completed. Train Loss: {train_loss.item():.4f}, Valid Loss: {loss.item():.4f}")
+            self.save('../savepoints/gpt1.pth')
+
+
     @classmethod
     def load(cls, path, device):
         checkpoint = torch.load(path, map_location=device)
