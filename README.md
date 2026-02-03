@@ -21,6 +21,7 @@
 
 Запуск из корня репозитория:
 - `python src/model_fitting.py --device cuda --num_epoch 10 --save_dir savepoints --run_name gpt_poems`
+- `python src/model_fitting.py --device cpu --num_epoch 50 --save_dir savepoints --run_name gpt_poems --headAttention 8 --emb_size 512 --dict_size 2000 --dropout 0.1 --learning_rate 0.00001 --batch_size 128 --seq_len 64`
 
 После старта обучения сохраняются:
 - токенайзер: `savepoints/bpe_<dict_size>.dill` (или `.json`, если нет `dill`)

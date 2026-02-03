@@ -51,7 +51,7 @@ class BPE:
         pair_count = defaultdict(int)
         pair_pos = defaultdict(set)
 
-        for i in tqdm(range(len(ids) - 1)):
+        for i in range(len(ids) - 1):
             p = (ids[i], ids[i + 1])
             pair_count[p] += 1
             pair_pos[p].add(i)
@@ -68,7 +68,7 @@ class BPE:
         # ========================================================
         # MAIN LOOP
         # ========================================================
-        for step in range(max_merges):
+        for step in tqdm(range(max_merges), desc="Fitting BPE", unit="merge"):
             # --- 5. Берём самую частую валидную пару ---
             while heap:
                 neg_cnt, pair = heapq.heappop(heap)
@@ -133,9 +133,6 @@ class BPE:
             # пара больше не существует
             pair_count[pair] = 0
             pair_pos[pair].clear()
-
-            if step % max(1, max_merges // 10) == 0:
-                print(f"Обучено {step} merge")
 
         self.merges = merges
         self.is_fitted = True
