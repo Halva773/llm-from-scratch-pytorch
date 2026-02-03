@@ -115,7 +115,7 @@ class GPT(nn.Module):
             
         return x
 
-    def save(self, path, extra: dict | None = None):
+    def save(self, path, extra=None):
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint = {

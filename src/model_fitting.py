@@ -35,7 +35,11 @@ def main(**params):
     print_text_with_time("Text loaded and tokenizer fitted.")
 
     tokenizer_path = save_dir / f"bpe_{dict_size}.dill"
-    tokenizer.save(tokenizer_path)
+    try:
+        tokenizer.save(tokenizer_path)
+    except ModuleNotFoundError:
+        tokenizer_path = save_dir / f"bpe_{dict_size}.json"
+        tokenizer.save_json(tokenizer_path)
     print_text_with_time(f"Tokenizer saved to: {tokenizer_path}")
 
     tokens_ids = tokenizer.encode(text)
@@ -89,6 +93,7 @@ def main(**params):
         num_epochs=params.get("num_epoch", 100),
         learning_rate=params.get("learning_rate", 2.4e-4),
         checkpoint_path=str(model_path),
+        save_every_epochs=params.get("save_every_epochs", 1),
     )
     print_text_with_time("Training completed.")
 
@@ -111,4 +116,5 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_csv", type=str, default="dataset/poems.csv")
     parser.add_argument("--save_dir", type=str, default="src/savepoints")
     parser.add_argument("--run_name", type=str, default="gpt1")
+    parser.add_argument("--save_every_epochs", type=int, default=1)
     main(**vars(parser.parse_args()))

@@ -1,7 +1,15 @@
 import heapq
-import dill
 import sys
-from tqdm import tqdm
+import json
+try:
+    import dill
+except ModuleNotFoundError:  # pragma: no cover
+    dill = None
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:  # pragma: no cover
+    def tqdm(x, **kwargs):
+        return x
 from collections import defaultdict
 from pathlib import Path
 
@@ -137,8 +145,8 @@ class BPE:
     # ============================================================
 
     def encode(self, text: str):
-        # if not self.is_fitted:
-        #     raise RuntimeError("Call fit first")
+        if not self.is_fitted:
+            raise RuntimeError("Tokenizer is not fitted. Call fit() or load().")
 
         # greedy longest-match (как у тебя, но быстрее)
         if not hasattr(self, "_tokens_by_first_char"):
@@ -171,7 +179,42 @@ class BPE:
     # SAVE / LOAD
     # ============================================================
 
+    def to_dict(self) -> dict:
+        if not self.is_fitted:
+            raise RuntimeError("Tokenizer is not fitted. Call fit() first.")
+
+        max_id = max(self.id2token.keys()) if self.id2token else -1
+        id2token_list = [self.id2token[i] for i in range(max_id + 1)]
+
+        return {
+            "vocab_size": self.vocab_size,
+            "is_fitted": self.is_fitted,
+            "base_vocab_size": getattr(self, "base_vocab_size", None),
+            "id2token": id2token_list,
+            "merges": [list(p) for p in getattr(self, "merges", [])],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        obj = cls(vocab_size=int(data["vocab_size"]))
+        obj.is_fitted = bool(data.get("is_fitted", True))
+
+        id2token_list = data["id2token"]
+        obj.id2token = {i: tok for i, tok in enumerate(id2token_list)}
+        obj.token2id = {tok: i for i, tok in obj.id2token.items()}
+        obj.base_vocab_size = data.get("base_vocab_size", len(obj.token2id))
+        obj.merges = [tuple(p) for p in data.get("merges", [])]
+        return obj
+
+    def save_json(self, filename):
+        path = Path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(self.to_dict(), f, ensure_ascii=False)
+
     def save(self, filename):
+        if dill is None:
+            raise ModuleNotFoundError("dill is required to save tokenizer as .dill. Install dill or use save_json().")
         path = Path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("wb") as f:
@@ -180,6 +223,11 @@ class BPE:
     @classmethod
     def load(cls, filename):
         path = Path(filename)
+        if path.suffix.lower() == ".json":
+            with path.open("r", encoding="utf-8") as f:
+                return cls.from_dict(json.load(f))
+        if dill is None:
+            raise ModuleNotFoundError("dill is required to load tokenizer from .dill. Install dill or use a .json tokenizer.")
         with path.open("rb") as f:
             obj = dill.load(f)
         obj.is_fitted = True
