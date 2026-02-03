@@ -60,7 +60,7 @@ def main(**params):
     )
 
 
-    GPT_model.git(
+    GPT_model.fit(
         train_loader=train_loader,
         valid_loader=valid_loader,
         num_epochs=params.get("num_epoch", 100),

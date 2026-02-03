@@ -1,6 +1,7 @@
 import heapq
 import dill
 import sys
+from tqdm import tqdm
 from collections import defaultdict
 from pathlib import Path
 
@@ -42,7 +43,7 @@ class BPE:
         pair_count = defaultdict(int)
         pair_pos = defaultdict(set)
 
-        for i in range(len(ids) - 1):
+        for i in tqdm(range(len(ids) - 1)):
             p = (ids[i], ids[i + 1])
             pair_count[p] += 1
             pair_pos[p].add(i)
