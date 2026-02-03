@@ -181,5 +181,6 @@ class BPE:
     def load(cls, filename):
         path = Path(filename)
         with path.open("rb") as f:
-            return dill.load(f)
-        self.is_fitted = True
+            obj = dill.load(f)
+        obj.is_fitted = True
+        return obj

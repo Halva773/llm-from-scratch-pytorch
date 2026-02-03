@@ -3,10 +3,9 @@ import torch
 
 
 class GetData(Dataset):
-    def __init__(self, data: list, seq_len: int, device: str = 'cpu'):
-        self.data = data
+    def __init__(self, data: list[int], seq_len: int):
+        self.data = torch.tensor(data, dtype=torch.long)
         self.seq_len = seq_len
-        self.device = device
 
 
     def __len__(self):
@@ -14,6 +13,6 @@ class GetData(Dataset):
     
 
     def __getitem__(self, idx: int):
-        x = torch.tensor(self.data[idx:idx + self.seq_len ], device=self.device)
-        y = torch.tensor(self.data[idx + 1:idx + self.seq_len + 1], device=self.device)
+        x = self.data[idx : idx + self.seq_len]
+        y = self.data[idx + 1 : idx + self.seq_len + 1]
         return x, y

@@ -1,7 +1,12 @@
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch
-from tqdm import tqdm
+from pathlib import Path
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:  # pragma: no cover
+    def tqdm(x, **kwargs):
+        return x
 
 from model.embedings import TokenEmbeddings, PositionalEmbeddings
 from model.decoder import Decoder
@@ -110,20 +115,35 @@ class GPT(nn.Module):
             
         return x
 
-    def save(self, path):
-        torch.save({
-            'model_state_dict': self.state_dict(),
-            'vocab_size': self.vocab_size,
-            'max_seq_len': self.max_seq_len,
-            'emb_size': self.emb_size,
-            'num_heads': self.num_heads,
-            'head_size': self.head_size,
-            'num_layers': self.num_layers
-        }, path)
+    def save(self, path, extra: dict | None = None):
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint = {
+            "model_state_dict": self.state_dict(),
+            "vocab_size": self.vocab_size,
+            "max_seq_len": self.max_seq_len,
+            "emb_size": self.emb_size,
+            "num_heads": self.num_heads,
+            "head_size": self.head_size,
+            "num_layers": self.num_layers,
+            "dropout": self.dropout_float,
+        }
+        if extra:
+            checkpoint.update(extra)
+        torch.save(checkpoint, path)
     
-    def fit(self, train_loader: DataLoader, valid_loader: DataLoader, num_epochs: int, learning_rate: float):
+    def fit(
+        self,
+        train_loader: DataLoader,
+        valid_loader: DataLoader,
+        num_epochs: int,
+        learning_rate: float,
+        checkpoint_path: str = "src/savepoints/gpt1.pth",
+        save_every_epochs: int = 1,
+    ):
         device = torch.device(self.device) if isinstance(self.device, str) else self.device
-        self.to(device)        
+        self.to(device)
+        self.device = device
 
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         self.losses = [{'train': [], 'valid': []}]
@@ -132,14 +152,14 @@ class GPT(nn.Module):
         for epoch in tqdm(range(num_epochs)):
             self.train()
             for x, y in train_loader:
-                x = x.to(self.device)
-                y = y.to(self.device)
+                x = x.to(device, non_blocking=True)
+                y = y.to(device, non_blocking=True)
                 logits = self(x)
                 targets = y
                 B, T, V = logits.shape
                 
-                logits_flat = logits.view(B * T, V)
-                targets_flat = targets.view(B * T)
+                logits_flat = logits.reshape(B * T, V)
+                targets_flat = targets.reshape(B * T)
 
                 train_loss = cross_entropy(logits_flat, targets_flat)
                 self.losses[0]['train'].append(train_loss.item())
@@ -151,22 +171,30 @@ class GPT(nn.Module):
             self.eval()
             with torch.no_grad():
                 for x, y in valid_loader:
-                    x = x.to(self.device)
-                    y = y.to(self.device)
+                    x = x.to(device, non_blocking=True)
+                    y = y.to(device, non_blocking=True)
                     logits = self(x)
                     targets = y
 
                     B, T, V = logits.shape
-                    logits_flat = logits.view(B * T, V)
-                    targets_flat = targets.view(B * T)
+                    logits_flat = logits.reshape(B * T, V)
+                    targets_flat = targets.reshape(B * T)
 
                     loss = cross_entropy(logits_flat, targets_flat)
                     self.losses[0]['valid'].append(loss.item())
             print(f"Epoch {epoch + 1}/{num_epochs} completed. Train Loss: {train_loss.item():.4f}, Valid Loss: {loss.item():.4f}")
-            self.save('src/savepoints/gpt1.pth')
+            if save_every_epochs and (epoch + 1) % save_every_epochs == 0:
+                self.save(
+                    checkpoint_path,
+                    extra={
+                        "epoch": epoch + 1,
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "losses": self.losses,
+                    },
+                )
 
     @classmethod
-    def load(cls, path, device):
+    def load(cls, path, device="cpu"):
         checkpoint = torch.load(path, map_location=device)
         model = cls(
             vocab_size=checkpoint['vocab_size'],
@@ -174,10 +202,13 @@ class GPT(nn.Module):
             emb_size=checkpoint['emb_size'],
             num_heads=checkpoint['num_heads'],
             head_size=checkpoint['head_size'],
-            num_layers=checkpoint['num_layers']
+            num_layers=checkpoint['num_layers'],
+            dropout=checkpoint.get("dropout", 0.1),
+            device=device,
         )
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
+        model.eval()
         return model
 
 

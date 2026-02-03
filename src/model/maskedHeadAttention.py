@@ -9,7 +9,11 @@ class HeadAttention(nn.Module):
         self.Wq = nn.Linear(emb_size, head_size)
         self.Wv = nn.Linear(emb_size, head_size)
 
-        self.mask = torch.tril(torch.ones(max_seq_len, max_seq_len))
+        self.register_buffer(
+            "mask",
+            torch.tril(torch.ones(max_seq_len, max_seq_len, dtype=torch.bool)),
+            persistent=False,
+        )
 
 
     def forward(self, x: torch.Tensor):
@@ -25,9 +29,10 @@ class HeadAttention(nn.Module):
         V = self.Wv(x)
 
         attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
-        mask = self.mask[:K.size(1), :K.size(1)]
+        T = K.size(1)
+        mask = self.mask[:T, :T]
 
-        attn_weights = attn_weights.masked_fill(mask == 0, float('-inf'))
+        attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
         attn_weights = torch.softmax(attn_weights, dim=-1) 
         out = attn_weights @ V
         return out
