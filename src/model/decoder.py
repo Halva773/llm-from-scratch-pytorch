@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch
 
-from maskedHeadAttention import MultiHeadAttention
-from ffn import FeedForward
+from model.maskedHeadAttention import MultiHeadAttention
+from model.ffn import FeedForward
 
 class Decoder(nn.Module):
     def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: int = 0.1):

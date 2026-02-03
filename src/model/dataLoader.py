@@ -10,7 +10,7 @@ class GetData(Dataset):
 
 
     def __len__(self):
-        return len(self.data) - self.seq_len
+        return len(self.data) - self.seq_len - 1
     
 
     def __getitem__(self, idx: int):

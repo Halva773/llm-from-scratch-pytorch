@@ -1,9 +1,9 @@
 import torch.nn as nn
 import torch
 
-from embedings import TokenEmbeddings, PositionalEmbeddings
-from decoder import Decoder
-from dataLoader import DataLoader
+from model.embedings import TokenEmbeddings, PositionalEmbeddings
+from model.decoder import Decoder
+from model.dataLoader import DataLoader
 
 
 class GPT(nn.Module):
