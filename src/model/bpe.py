@@ -1,6 +1,12 @@
 import heapq
 import dill
+import sys
 from collections import defaultdict
+from pathlib import Path
+
+# Backward-compat for older dill files that referenced module name `bpe`.
+# If `BPE` was pickled as `bpe.BPE`, unpickling will try to import `bpe`.
+sys.modules.setdefault("bpe", sys.modules[__name__])
 
 
 class BPE:
@@ -130,8 +136,8 @@ class BPE:
     # ============================================================
 
     def encode(self, text: str):
-        if not self.is_fitted:
-            raise RuntimeError("Call fit first")
+        # if not self.is_fitted:
+        #     raise RuntimeError("Call fit first")
 
         # greedy longest-match (как у тебя, но быстрее)
         if not hasattr(self, "_tokens_by_first_char"):
@@ -165,10 +171,14 @@ class BPE:
     # ============================================================
 
     def save(self, filename):
-        with open(filename, "wb") as f:
+        path = Path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("wb") as f:
             dill.dump(self, f)
 
     @classmethod
     def load(cls, filename):
-        with open(filename, "rb") as f:
+        path = Path(filename)
+        with path.open("rb") as f:
             return dill.load(f)
+        self.is_fitted = True

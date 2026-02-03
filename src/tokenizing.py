@@ -1,10 +1,11 @@
 import pandas as pd
-from bpe import BPE
+
+from model.bpe import BPE
 
 
 
 if __name__ == '__main__':
-    filepath = "../../dataset/poems.csv"
+    filepath = "dataset/poems.csv"
     data = pd.read_csv(filepath)
     data = data.dropna(subset=['text'])
     print(data.shape)
@@ -14,4 +15,4 @@ if __name__ == '__main__':
     whole_text = "\n".join(data['text'])
     print("Text formatted. Going to fit tokenizer")
     bpe.fit(whole_text)
-    bpe.save('../savepoints/bpe_16k.dill')
+    bpe.save('src/savepoints/bpe_16k_1k.dill')

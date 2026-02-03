@@ -1,9 +1,11 @@
+from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch
+from tqdm import tqdm
 
 from model.embedings import TokenEmbeddings, PositionalEmbeddings
 from model.decoder import Decoder
-from model.dataLoader import DataLoader
+from model.dataLoader import GetData
 
 
 class GPT(nn.Module):
@@ -108,7 +110,6 @@ class GPT(nn.Module):
             
         return x
 
-
     def save(self, path):
         torch.save({
             'model_state_dict': self.state_dict(),
@@ -120,7 +121,6 @@ class GPT(nn.Module):
             'num_layers': self.num_layers
         }, path)
     
-
     def fit(self, train_loader: DataLoader, valid_loader: DataLoader, num_epochs: int, learning_rate: float):
         device = torch.device(self.device) if isinstance(self.device, str) else self.device
         self.to(device)        
@@ -129,7 +129,7 @@ class GPT(nn.Module):
         self.losses = [{'train': [], 'valid': []}]
         cross_entropy = nn.CrossEntropyLoss()
         
-        for epoch in range(num_epochs):
+        for epoch in tqdm(range(num_epochs)):
             self.train()
             for x, y in train_loader:
                 x = x.to(self.device)
@@ -163,8 +163,7 @@ class GPT(nn.Module):
                     loss = cross_entropy(logits_flat, targets_flat)
                     self.losses[0]['valid'].append(loss.item())
             print(f"Epoch {epoch + 1}/{num_epochs} completed. Train Loss: {train_loss.item():.4f}, Valid Loss: {loss.item():.4f}")
-            self.save('../savepoints/gpt1.pth')
-
+            self.save('src/savepoints/gpt1.pth')
 
     @classmethod
     def load(cls, path, device):
