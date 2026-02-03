@@ -2,6 +2,7 @@ import pandas as pd
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
+from datetime import datetime
 
 from model.gpt import GPT
 from model.bpe import BPE
@@ -10,29 +11,34 @@ from model.dataLoader import GetData
 def get_text(filepath: str) -> str:
     data = pd.read_csv(filepath)
     data = data.dropna(subset=['text'])
-    return "\n".join(data.loc[:1000, 'text'])
+    return "\n".join(data['text'])
+
+
+def print_text_with_time(text: str) -> None:
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{current_time}] {text}")
 
 
 def main(**params):
-    print('Training with parameters:' \
-    '\n'.join([f'{k}: {v}' for k, v in params.items()]))
+    print_text_with_time('Training with parameters:')
+    print('\n'.join([f'{k}: {v}' for k, v in params.items()]))
 
-    tokenizer = BPE(dict_size=params.get("dict_size", 40000))
+    tokenizer = BPE(params.get("dict_size", 40000))
     text = get_text("dataset/poems.csv")
     tokenizer.fit(text)
 
-    print("Text loaded and tokenizer fitted.")
+    print_text_with_time("Text loaded and tokenizer fitted.")
 
     tokens_ids = tokenizer.encode(text)
     print(f"Number of tokens: {len(tokens_ids)}")
 
-    print("Preparing data loaders...")
+    print_text_with_time("Preparing data loaders...")
 
     n = int(0.9*len(tokens_ids)) # 90% train
     train_token_ids = tokens_ids[:n]
     valid_token_ids = tokens_ids[n:]
 
-    print(f"Train tokens: {len(train_token_ids)}, Valid tokens: {len(valid_token_ids)}")
+    print_text_with_time(f"Train tokens: {len(train_token_ids)}, Valid tokens: {len(valid_token_ids)}")
 
     train_data = GetData(train_token_ids, seq_len=params.get("seq_len", 512), device=params.get("device", "cpu"))
     train_loader = DataLoader(train_data, batch_size=params.get("batch_size", 64))
@@ -40,7 +46,7 @@ def main(**params):
     valid_data = GetData(valid_token_ids, seq_len=params.get("seq_len", 512), device=params.get("device", "cpu"))
     valid_loader = DataLoader(valid_data, batch_size=params.get("batch_size", 64))
 
-    print("Start fitting...")
+    print_text_with_time("Start fitting...")
 
     GPT_model = GPT(
         vocab_size=params.get("dict_size", 40000),
@@ -60,6 +66,7 @@ def main(**params):
         num_epochs=params.get("num_epoch", 100),
         learning_rate=params.get("learning_rate", 2.4e-4)
     )
+    print_text_with_time("Training completed.")
 
     
 
