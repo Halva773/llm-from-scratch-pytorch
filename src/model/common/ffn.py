@@ -4,10 +4,10 @@ import torch
 
 
 class FeedForward(nn.Module):
-    def __init__(self, emb_size: int, dropout: int = 0.1):
+    def __init__(self, emb_size: int, dropout: int = 0.1, ffn_norm = nn.ReLU()):
         super().__init__()
         self.first_linear = nn.Linear(emb_size, 4*emb_size)
-        self.relu = nn.ReLU()
+        self.relu = ffn_norm
         self.second_linear = nn.Linear(4*emb_size, emb_size)
         self.dropout = nn.Dropout(dropout)
 

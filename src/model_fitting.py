@@ -4,15 +4,15 @@ import torch
 from datetime import datetime
 import argparse
 
-from model.gpt import GPT
-from model.bpe import BPE
-from model.dataLoader import GetData
+from model.gpt1.model import GPT
+from model.common.bpe import BPE
+from model.common.dataLoader import GetData
 from pathlib import Path
 
 def get_text(filepath: str) -> str:
     data = pd.read_csv(filepath)
     data = data.dropna(subset=['text'])
-    return "\n".join(data['text'])
+    return "\n".join(data.loc[:1000, 'text'])
 
 
 def print_text_with_time(text: str) -> None:

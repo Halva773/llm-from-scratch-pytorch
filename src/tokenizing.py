@@ -1,6 +1,6 @@
 import pandas as pd
 
-from model.bpe import BPE
+from model.common.bpe import BPE
 
 
 

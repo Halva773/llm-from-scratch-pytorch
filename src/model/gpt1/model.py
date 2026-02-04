@@ -8,12 +8,31 @@ except ModuleNotFoundError:  # pragma: no cover
     def tqdm(x, **kwargs):
         return x
 
-from model.embedings import TokenEmbeddings, PositionalEmbeddings
-from model.decoder import Decoder
-from model.dataLoader import GetData
+from model.common.embedings import TokenEmbeddings, PositionalEmbeddings
+from model.common.dataLoader import GetData
+from model.common.maskedHeadAttention import MultiHeadAttention
+from model.common.ffn import FeedForward
 
 
-class GPT(nn.Module):
+class Decoder(nn.Module):
+    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: int = 0.1):
+        super().__init__()
+        self.mha = MultiHeadAttention(num_heads, emb_size, head_size, max_seq_len, dropout)
+        self.ff = FeedForward(emb_size=emb_size, dropout=dropout)
+        self.first_norm = nn.LayerNorm(emb_size)
+        self.second_norm = nn.LayerNorm(emb_size)
+
+    def forward(self, x: torch.Tensor):
+        O = self.mha(x)
+        O += x
+        Ow = self.first_norm(O)
+        Ok = self.ff(Ow)
+        Ok += Ow
+        Oj = self.second_norm(Ok)
+        return Oj
+
+
+class GPT2(nn.Module):
     def __init__(self, 
                 vocab_size: int, 
                 max_seq_len: int, 
@@ -211,24 +230,16 @@ class GPT(nn.Module):
         model.eval()
         return model
 
-
-
-
-
 if __name__ == "__main__":
-    vocab_size = 10000
-    batch_size = 1
-    seq_len = 12
-    emb_size = 12
-    num_heads = 5
-    head_size = 8
-    max_seq_len = 20
-    num_layers = 8
-    dropout = 0.1
 
-    device = 'cpu'
-
-    gpt = GPT(vocab_size, max_seq_len, emb_size, num_heads, head_size, num_layers, dropout, device)
+    gpt = GPT(vocab_size=10000,
+              max_seq_len=1,
+              emb_size=12,
+              num_heads=12, 
+              head_size=8, 
+              num_layers=8,
+              dropout=0.1, 
+              device='cpu')
 
 
     x = torch.tensor([
@@ -238,5 +249,5 @@ if __name__ == "__main__":
     out = gpt.generate(x, max_new_tokens=10)
     gpt.save("data/gpt_model.pth")
 
-    gpt = GPT.load("data/gpt_model.pth", device=device)
+    gpt = GPT.load("data/gpt_model.pth", device='cpu')
     print(out, out.shape)
