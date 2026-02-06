@@ -9,7 +9,6 @@ except ModuleNotFoundError:  # pragma: no cover
         return x
 
 from model.common.embedings import TokenEmbeddings, PositionalEmbeddings
-from model.common.dataLoader import GetData
 from model.common.maskedHeadAttention import MultiHeadAttention
 from model.common.ffn import FeedForward
 
@@ -29,14 +28,17 @@ class Decoder(nn.Module):
         self.first_norm = nn.LayerNorm(emb_size)
         self.second_norm = nn.LayerNorm(emb_size)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
         O = self.first_norm(x)
-        Omha = self.mha(O)
+        Omha, cache = self.mha(O, use_cache=use_cache, cache=cache)
         Omha += x
         outs = self.second_norm(Omha)
         logits = self.ff(outs)
         logits += Omha
-        return logits
+        if use_cache:
+            return logits, cache
+        else:
+            return logits, None
 
 
 class GPT2(nn.Module):
@@ -242,7 +244,7 @@ class GPT2(nn.Module):
 
 if __name__ == "__main__":
 
-    gpt = GPT(vocab_size=10000,
+    gpt = GPT2(vocab_size=10000,
               max_seq_len=1,
               emb_size=12,
               num_heads=12, 
@@ -259,5 +261,5 @@ if __name__ == "__main__":
     out = gpt.generate(x, max_new_tokens=10)
     gpt.save("data/gpt_model.pth")
 
-    gpt = GPT.load("data/gpt_model.pth", device='cpu')
+    gpt = GPT2.load("data/gpt_model.pth", device='cpu')
     print(out, out.shape)
