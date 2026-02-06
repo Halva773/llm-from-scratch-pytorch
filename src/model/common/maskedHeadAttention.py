@@ -16,26 +16,37 @@ class HeadAttention(nn.Module):
         )
 
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: tuple = None):
         """
         Docstring for forward
         
         :param self: Description
-        :param x: Description (batch_size x seq_len x emb_size)
+        :param x: Description (batch_size x seq_len x emb_size) 
         :type x: torch.Tensor
         """
         Q = self.Wq(x) # Q = x ⋅ Wq.⊤ + b
         K = self.Wk(x)
         V = self.Wv(x)
 
-        attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
-        T = K.size(1)
-        mask = self.mask[:T, :T]
+        if cache is not None:
+            key_cache, value_cache = cache
+            K = torch.cat([key_cache, K], dim=1)
+            V = torch.cat([value_cache, V], dim=1)
 
-        attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
+
+        attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
+
+        if cache is None:
+            T = K.size(1)
+            mask = self.mask[:T, :T].byte()
+            attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
+            
         attn_weights = torch.softmax(attn_weights, dim=-1) 
         out = attn_weights @ V
-        return out
+        if use_cache:
+            return out, (K, V)
+        else:
+            return out, None
 
 
 
@@ -47,12 +58,21 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
 
-    def forward(self, x: torch.Tensor):
-        heads_out = [head(x) for head in self.heads]
-        O = torch.cat(heads_out, dim=-1)
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
+        heads_out = [head(x, use_cache=use_cache, cache=cache[i] if cache is not None else None) for i, head in enumerate(self.heads)]
+        new_cache = []
+        outs = []
+        for i, (out, head_cache) in enumerate(heads_out):
+            if head_cache is not None:
+                new_cache.append(head_cache) 
+            outs.append(out)
+        O = torch.cat(outs, dim=-1)
         O = self.linear(O)
         O = self.dropout(O)
-        return O
+        if use_cache:
+            return O, new_cache
+        else:
+            return O, None
 
 
 if __name__ == "__main__":
@@ -64,5 +84,5 @@ if __name__ == "__main__":
     x = torch.randn(2, max_seq_len, emb_size)  # batch_size x seq_len x emb_size
 
     model = MultiHeadAttention(num_heads=num_heads, emb_size=emb_size, head_size=head_size, max_seq_len=max_seq_len)
-    out = model.forward(x)
+    out = model.forward(x, use_cache=False, cache=None)
     print(out.shape)  # Expected output shape: (2, max_seq_len, head_size)
