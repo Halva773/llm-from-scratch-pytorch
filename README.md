@@ -1,40 +1,64 @@
 # llm-from-scratch-pytorch
 ![Alt](https://repobeats.axiom.co/api/embed/6ca15cc238ef1f07307e0a19532198dee6c28f83.svg "Repobeats analytics image")
 
-## Datasets
-- https://www.kaggle.com/datasets/grafstor/19-000-russian-poems (tokenizing)
+## Структура проекта
 
-## Быстрый запуск (сервер)
+- `src/model/common/` — общие компоненты (BPE, attention, FFN, embeddings, dataset).
+- `src/model/gpt1/model.py` — реализация модели `gpt1`.
+- `src/model/gpt2/model.py` — реализация модели `gpt2`.
+- `src/model_fitting.py` — обучение (точка входа для тренировки).
+- `src/infer.py` — инференс/генерация (точка входа для текста).
+- `src/tokenizing.py` — вспомогательные функции/скрипт для подготовки токенизации (если используется).
+- `dataset/` — данные (например `dataset/poems.csv`).
+- `savepoints/` — рекомендуемая папка для сохранений (чекпойнты и токенайзер).
 
-### 1) Зависимости
+## Данные
 
-Установи зависимости:
+Скрипт обучения ожидает CSV `dataset/poems.csv` с колонкой `text`.
+
+Пример датасета:
+- `https://www.kaggle.com/datasets/grafstor/19-000-russian-poems`
+
+## Установка зависимостей
+
 - `pip install -r requirements.txt`
 
-Примечание: если нужен GPU, установку `torch` лучше делать согласно инструкции PyTorch под вашу CUDA (а не “как есть” из `requirements.txt`).
+Примечание: если нужен GPU, `torch` лучше ставить по инструкции PyTorch под вашу CUDA, а не “как есть” из `requirements.txt`.
 
-### 2) Данные
+## Точки входа
 
-Скрипт ожидает CSV `dataset/poems.csv` с колонкой `text`.
+- Обучение: `python src/model_fitting.py ...`
+- Инференс: `python src/infer.py ...`
 
-### 3) Обучение
+В обоих скриптах добавлен параметр выбора реализации модели:
+- `--model_type gpt1|gpt2`
 
-Запуск из корня репозитория:
-- `python src/model_fitting.py --device cuda --num_epoch 10 --save_dir savepoints --run_name gpt_poems`
-- `python src/model_fitting.py --device cpu --num_epoch 50 --save_dir savepoints --run_name gpt_poems --headAttention 8 --emb_size 512 --dict_size 2000 --dropout 0.1 --learning_rate 0.00001 --batch_size 128 --seq_len 64`
+## Обучение (model_fitting.py)
 
-После старта обучения сохраняются:
+Важно: обучение может занимать очень много времени (особенно на CPU).
+
+Примеры (запуск из корня репозитория):
+- `python src/model_fitting.py --model_type gpt1 --device cuda --num_epoch 10 --save_dir savepoints --run_name gpt1_poems`
+- `python src/model_fitting.py --model_type gpt2 --device cuda --num_epoch 10 --save_dir savepoints --run_name gpt2_poems`
+- `python src/model_fitting.py --model_type gpt1 --device cpu --num_epoch 50 --save_dir savepoints --run_name gpt_poems --headAttention 8 --emb_size 512 --dict_size 2000 --dropout 0.1 --learning_rate 0.00001 --batch_size 128 --seq_len 64`
+
+Что сохраняется:
 - токенайзер: `savepoints/bpe_<dict_size>.dill` (или `.json`, если нет `dill`)
-- модель (чекпоинт): `savepoints/<run_name>.pth`
+- модель (чекпойнт): `savepoints/<run_name>.pth`
 
 Если нужно без `dill`, токенайзер можно сохранять/грузить как JSON через `BPE.save_json(...)` / `BPE.load("...json")`.
 
-### 4) Инференс (проверка, что веса грузятся)
+## Инференс (infer.py)
 
-- `python src/infer.py --device cuda --model savepoints/gpt_poems.pth --tokenizer savepoints/bpe_40000.dill --prompt "Привет, мир!" --max_new_tokens 50`
+Примеры:
+- `python src/infer.py --model_type gpt1 --device cuda --model savepoints/gpt1_poems.pth --tokenizer savepoints/bpe_40000.dill --prompt "Привет, мир!" --max_new_tokens 50`
+- `python src/infer.py --model_type gpt2 --device cuda --model savepoints/gpt2_poems.pth --tokenizer savepoints/bpe_40000.dill --prompt "Привет, мир!" --max_new_tokens 50 --do_sample --temperature 0.9 --top_k 50`
+
+Подсказка: `dict_size` токенайзера должен совпадать с `vocab_size` модели, иначе чекпойнт не загрузится.
 
 ## Docker (опционально)
 
 CPU вариант:
 - `docker build -t llm-from-scratch .`
-- `docker run --rm -it -v ${PWD}/dataset:/app/dataset -v ${PWD}/savepoints:/app/savepoints llm-from-scratch python src/model_fitting.py --device cpu --save_dir savepoints --run_name gpt_poems`
+- `docker run --rm -it -v ${PWD}/dataset:/app/dataset -v ${PWD}/savepoints:/app/savepoints llm-from-scratch python src/model_fitting.py --model_type gpt1 --device cpu --save_dir savepoints --run_name gpt_poems`
+

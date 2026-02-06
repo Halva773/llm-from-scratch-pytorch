@@ -1,12 +1,28 @@
 import argparse
 import torch
 
-from model.gpt1.model import GPT
 from model.common.bpe import BPE
+
+
+def get_model_cls(model_type: str):
+    if model_type == "gpt1":
+        from model.gpt1.model import GPT2 as ModelCls
+        return ModelCls
+    if model_type == "gpt2":
+        from model.gpt2.model import GPT2 as ModelCls
+        return ModelCls
+    raise ValueError(f"Unknown --model_type: {model_type}. Expected: gpt1, gpt2")
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        default="gpt1",
+        choices=["gpt1", "gpt2"],
+        help="Which model implementation to use: gpt1 or gpt2.",
+    )
     parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--tokenizer", type=str, required=True)
     parser.add_argument("--prompt", type=str, required=True)
@@ -20,8 +36,9 @@ def main():
 
     device = torch.device(args.device)
 
+    ModelCls = get_model_cls(args.model_type)
     tokenizer = BPE.load(args.tokenizer)
-    model = GPT.load(args.model, device=device)
+    model = ModelCls.load(args.model, device=device)
 
     token_ids = tokenizer.encode(args.prompt)
     x = torch.tensor([token_ids], dtype=torch.long, device=device)
