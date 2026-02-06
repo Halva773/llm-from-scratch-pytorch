@@ -8,12 +8,39 @@ except ModuleNotFoundError:  # pragma: no cover
     def tqdm(x, **kwargs):
         return x
 
-from model.embedings import TokenEmbeddings, PositionalEmbeddings
-from model.decoder import Decoder
-from model.dataLoader import GetData
+from model.common.embedings import TokenEmbeddings, PositionalEmbeddings
+from model.common.maskedHeadAttention import MultiHeadAttention
+from model.common.ffn import FeedForward
+
+class GELU(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def forward(self, x: torch.Tensor):
+        return 0.5*x*(1+torch.tanh(torch.sqrt(torch.tensor(2)/torch.pi)*(x+torch.tensor(0.044715)*torch.pow(x, 3))))
 
 
-class GPT(nn.Module):
+class Decoder(nn.Module):
+    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: int = 0.1):
+        super().__init__()
+        self.mha = MultiHeadAttention(num_heads, emb_size, head_size, max_seq_len, dropout)
+        self.ff = FeedForward(emb_size=emb_size, dropout=dropout, ffn_norm=GELU())
+        self.first_norm = nn.LayerNorm(emb_size)
+        self.second_norm = nn.LayerNorm(emb_size)
+
+
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
+        O = self.first_norm(x)
+        Omha, new_cache = self.mha(O, use_cache=use_cache, cache=cache)
+        Omha += x
+        outs = self.second_norm(Omha)
+        logits = self.ff(outs)
+        logits += Omha
+        return logits, new_cache if use_cache else None
+
+
+
+class GPT2(nn.Module):
     def __init__(self, 
                 vocab_size: int, 
                 max_seq_len: int, 
@@ -42,19 +69,43 @@ class GPT(nn.Module):
                 for _ in range(self.num_layers)
             ])
         self.linear = nn.Linear(self.emb_size, self.vocab_size)
+        self.ln = nn.LayerNorm(self.emb_size)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
         B, T = x.shape
         
         tokenEmbeddings = self.tokenEmbedings(x)
-        posEmbeddings = self.positionalEmbeddings(T)
+        if cache is None:
+            posEmbeddings = self.positionalEmbeddings(seq_len=T, start_pos=0)
+        else:
+            # берем K первого слоя, первой головы
+            prev_len = cache[0][0][0].shape[1]
+            posEmbeddings = self.positionalEmbeddings(seq_len=1, start_pos=prev_len)
+
 
         embeddings = tokenEmbeddings + posEmbeddings
         out = self.dropout(embeddings)
-        for decoder in self.decoders:
-            out = decoder(out)
-        out = self.linear(out)
-        return out
+
+        new_cache = [] if use_cache else None
+        for i, decoder in enumerate(self.decoders):
+            layer_cache = cache[i] if cache is not None else None
+
+            out, layer_new_cache = decoder(
+                out,
+                use_cache=use_cache,
+                cache=layer_cache
+            )
+
+            if use_cache:
+                new_cache.append(layer_new_cache)
+        logits = self.ln(out)
+
+        outs = self.linear(logits)
+        if use_cache:
+            return outs, new_cache
+        else:
+            return outs, None
+
     
     def generate(   
                     self, 
@@ -63,19 +114,19 @@ class GPT(nn.Module):
                     do_sample: bool = False,
                     temperature: float = 1.0,
                     top_k: int = None,
-                    top_p: float = None
+                    top_p: float = None,
+                    use_cache: bool = True
                 ):
         
         
-        
+        cache = None
         for _ in range(max_new_tokens):
-            O = x[:, -self.max_seq_len:]
-            logit = self.forward(O)
+            if cache is None:
+                logit, cache = self.forward(x, use_cache=use_cache, cache=None)
+            else:
+                logit, cache = self.forward(x[:, -1:], use_cache=use_cache, cache=cache)
             # Get the last token's logits
-            logits = logit[:, -1, :]
-            # Scale logits by temperature
-            logits = logits / temperature
-
+            logits = logit[:, -1, :] / temperature
             if do_sample and top_k is not None:
                 values, _ = torch.topk(logits, top_k, dim=-1)
                 min_topk = values[:, -1].unsqueeze(-1)
@@ -154,7 +205,7 @@ class GPT(nn.Module):
             for x, y in train_loader:
                 x = x.to(device, non_blocking=True)
                 y = y.to(device, non_blocking=True)
-                logits = self(x)
+                logits = self(x, use_cache=False)
                 targets = y
                 B, T, V = logits.shape
                 
@@ -173,7 +224,7 @@ class GPT(nn.Module):
                 for x, y in valid_loader:
                     x = x.to(device, non_blocking=True)
                     y = y.to(device, non_blocking=True)
-                    logits = self(x)
+                    logits = self(x, use_cache=False)
                     targets = y
 
                     B, T, V = logits.shape
@@ -211,24 +262,16 @@ class GPT(nn.Module):
         model.eval()
         return model
 
-
-
-
-
 if __name__ == "__main__":
-    vocab_size = 10000
-    batch_size = 1
-    seq_len = 12
-    emb_size = 12
-    num_heads = 5
-    head_size = 8
-    max_seq_len = 20
-    num_layers = 8
-    dropout = 0.1
 
-    device = 'cpu'
-
-    gpt = GPT(vocab_size, max_seq_len, emb_size, num_heads, head_size, num_layers, dropout, device)
+    gpt = GPT2(vocab_size=10000,
+              max_seq_len=1,
+              emb_size=12,
+              num_heads=12, 
+              head_size=8, 
+              num_layers=8,
+              dropout=0.1, 
+              device='cpu')
 
 
     x = torch.tensor([
@@ -238,5 +281,5 @@ if __name__ == "__main__":
     out = gpt.generate(x, max_new_tokens=10)
     gpt.save("data/gpt_model.pth")
 
-    gpt = GPT.load("data/gpt_model.pth", device=device)
+    gpt = GPT2.load("data/gpt_model.pth", device='cpu')
     print(out, out.shape)
