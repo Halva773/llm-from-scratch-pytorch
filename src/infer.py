@@ -1,8 +1,8 @@
 import argparse
 import torch
 
-from model.gpt import GPT
-from model.bpe import BPE
+from model.gpt1.model import GPT
+from model.common.bpe import BPE
 
 
 def main():
