@@ -16,26 +16,37 @@ class HeadAttention(nn.Module):
         )
 
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: tuple = None):
         """
         Docstring for forward
         
         :param self: Description
-        :param x: Description (batch_size x seq_len x emb_size)
+        :param x: Description (batch_size x seq_len x emb_size) 
         :type x: torch.Tensor
         """
         Q = self.Wq(x) # Q = x ⋅ Wq.⊤ + b
         K = self.Wk(x)
         V = self.Wv(x)
 
-        attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
-        T = K.size(1)
-        mask = self.mask[:T, :T]
+        if cache:
+            key_cache, value_cache = cache
+            K = torch.cat([key_cache, K], dim=1)
+            V = torch.cat([value_cache, V], dim=1)
 
-        attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
+
+        attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
+
+        if not cache:
+            T = K.size(1)
+            mask = self.mask[:T, :T].byte()
+            attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
+            
         attn_weights = torch.softmax(attn_weights, dim=-1) 
         out = attn_weights @ V
-        return out
+        if use_cache:
+            return out, (K, V)
+        else:
+            return out, None
 
 
 
