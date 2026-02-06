@@ -58,12 +58,21 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
 
-    def forward(self, x: torch.Tensor):
-        heads_out = [head(x) for head in self.heads]
-        O = torch.cat(heads_out, dim=-1)
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
+        heads_out = [head(x, use_cache=use_cache, cache=cache[i] if cache is not None else None) for i, head in enumerate(self.heads)]
+        new_cache = []
+        outs = []
+        for i, (out, head_cache) in enumerate(heads_out):
+            if head_cache is not None:
+                new_cache.append(head_cache) 
+            outs.append(out)
+        O = torch.cat(outs, dim=-1)
         O = self.linear(O)
         O = self.dropout(O)
-        return O
+        if use_cache:
+            return O, new_cache
+        else:
+            return O, None
 
 
 if __name__ == "__main__":
@@ -75,5 +84,5 @@ if __name__ == "__main__":
     x = torch.randn(2, max_seq_len, emb_size)  # batch_size x seq_len x emb_size
 
     model = MultiHeadAttention(num_heads=num_heads, emb_size=emb_size, head_size=head_size, max_seq_len=max_seq_len)
-    out = model.forward(x)
+    out = model.forward(x, use_cache=False, cache=None)
     print(out.shape)  # Expected output shape: (2, max_seq_len, head_size)
