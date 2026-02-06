@@ -4,10 +4,20 @@ import torch
 from datetime import datetime
 import argparse
 
-from model.gpt1.model import GPT
 from model.common.bpe import BPE
 from model.common.dataLoader import GetData
 from pathlib import Path
+
+
+def get_model_cls(model_type: str):
+    if model_type == "gpt1":
+        from model.gpt1.model import GPT2 as ModelCls
+        return ModelCls
+    if model_type == "gpt2":
+        from model.gpt2.model import GPT2 as ModelCls
+        return ModelCls
+    raise ValueError(f"Unknown --model_type: {model_type}. Expected: gpt1, gpt2")
+
 
 def get_text(filepath: str) -> str:
     data = pd.read_csv(filepath)
@@ -21,12 +31,21 @@ def print_text_with_time(text: str) -> None:
 
 
 def main(**params):
-    print_text_with_time('Training with parameters:')
-    print('\n'.join([f'{k}: {v}' for k, v in params.items()]))
-
+    model_type = params.get("model_type", "gpt1")
     dict_size = params.get("dict_size", 40000)
     save_dir = Path(params.get("save_dir", "src/savepoints"))
-    run_name = params.get("run_name", "gpt1")
+    run_name = params.get("run_name") or model_type
+
+    params = {
+        **params,
+        "model_type": model_type,
+        "dict_size": dict_size,
+        "save_dir": str(save_dir),
+        "run_name": run_name,
+    }
+
+    print_text_with_time("Training with parameters:")
+    print("\n".join([f"{k}: {v}" for k, v in params.items()]))
 
     tokenizer = BPE(dict_size)
     text = get_text(params.get("dataset_csv", "dataset/poems.csv"))
@@ -74,7 +93,8 @@ def main(**params):
 
     print_text_with_time("Start fitting...")
 
-    GPT_model = GPT(
+    ModelCls = get_model_cls(model_type)
+    GPT_model = ModelCls(
         vocab_size=dict_size,
         max_seq_len=params.get("seq_len", 512),
         emb_size=params.get("emb_size", 768),
@@ -103,6 +123,13 @@ def main(**params):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        default="gpt1",
+        choices=["gpt1", "gpt2"],
+        help="Which model implementation to train: gpt1 or gpt2.",
+    )
     parser.add_argument("--layers", type=int, default=12)
     parser.add_argument("--headAttention", type=int, default=12)
     parser.add_argument("--emb_size", type=int, default=768)
@@ -115,6 +142,11 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--dataset_csv", type=str, default="dataset/poems.csv")
     parser.add_argument("--save_dir", type=str, default="src/savepoints")
-    parser.add_argument("--run_name", type=str, default="gpt1")
+    parser.add_argument(
+        "--run_name",
+        type=str,
+        default=None,
+        help="Checkpoint name (without extension). Default: same as --model_type.",
+    )
     parser.add_argument("--save_every_epochs", type=int, default=1)
     main(**vars(parser.parse_args()))
