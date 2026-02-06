@@ -30,15 +30,13 @@ class Decoder(nn.Module):
 
     def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
         O = self.first_norm(x)
-        Omha, cache = self.mha(O, use_cache=use_cache, cache=cache)
+
+        Omha, new_cache = self.mha(O, use_cache=use_cache, cache=cache)
         Omha += x
         outs = self.second_norm(Omha)
         logits = self.ff(outs)
         logits += Omha
-        if use_cache:
-            return logits, cache
-        else:
-            return logits, None
+        return logits, new_cache if use_cache else None
 
 
 class GPT2(nn.Module):
@@ -72,20 +70,40 @@ class GPT2(nn.Module):
         self.linear = nn.Linear(self.emb_size, self.vocab_size)
         self.ln = nn.LayerNorm(self.emb_size)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
         B, T = x.shape
         
         tokenEmbeddings = self.tokenEmbedings(x)
-        posEmbeddings = self.positionalEmbeddings(T)
+        if cache is None:
+            posEmbeddings = self.positionalEmbeddings(seq_len=T, start_pos=0)
+        else:
+            # берем K первого слоя, первой головы
+            prev_len = cache[0][0][0].shape[1]
+            posEmbeddings = self.positionalEmbeddings(seq_len=1, start_pos=prev_len)
+
 
         embeddings = tokenEmbeddings + posEmbeddings
         out = self.dropout(embeddings)
-        for decoder in self.decoders:
-            out = decoder(out)
+
+        new_cache = [] if use_cache else None
+        for i, decoder in enumerate(self.decoders):
+            layer_cache = cache[i] if cache is not None else None
+
+            out, layer_new_cache = decoder(
+                out,
+                use_cache=use_cache,
+                cache=layer_cache
+            )
+
+            if use_cache:
+                new_cache.append(layer_new_cache)
         logits = self.ln(out)
 
         outs = self.linear(logits)
-        return outs
+        if use_cache:
+            return outs, new_cache
+        else:
+            return outs, None
     
     def generate(   
                     self, 
@@ -94,19 +112,19 @@ class GPT2(nn.Module):
                     do_sample: bool = False,
                     temperature: float = 1.0,
                     top_k: int = None,
-                    top_p: float = None
+                    top_p: float = None,
+                    use_cache: bool = True
                 ):
         
         
-        
+        cache = None
         for _ in range(max_new_tokens):
-            O = x[:, -self.max_seq_len:]
-            logit = self.forward(O)
+            if cache is None:
+                logit, cache = self.forward(x, use_cache=use_cache, cache=None)
+            else:
+                logit, cache = self.forward(x[:, -1:], use_cache=use_cache, cache=cache)
             # Get the last token's logits
-            logits = logit[:, -1, :]
-            # Scale logits by temperature
-            logits = logits / temperature
-
+            logits = logit[:, -1, :] / temperature
             if do_sample and top_k is not None:
                 values, _ = torch.topk(logits, top_k, dim=-1)
                 min_topk = values[:, -1].unsqueeze(-1)
@@ -185,7 +203,7 @@ class GPT2(nn.Module):
             for x, y in train_loader:
                 x = x.to(device, non_blocking=True)
                 y = y.to(device, non_blocking=True)
-                logits = self(x)
+                logits = self(x, use_cache=False)
                 targets = y
                 B, T, V = logits.shape
                 
@@ -204,7 +222,7 @@ class GPT2(nn.Module):
                 for x, y in valid_loader:
                     x = x.to(device, non_blocking=True)
                     y = y.to(device, non_blocking=True)
-                    logits = self(x)
+                    logits = self(x, use_cache=False)
                     targets = y
 
                     B, T, V = logits.shape

@@ -28,7 +28,7 @@ class HeadAttention(nn.Module):
         K = self.Wk(x)
         V = self.Wv(x)
 
-        if cache:
+        if cache is not None:
             key_cache, value_cache = cache
             K = torch.cat([key_cache, K], dim=1)
             V = torch.cat([value_cache, V], dim=1)
@@ -36,7 +36,7 @@ class HeadAttention(nn.Module):
 
         attn_weights = Q @ K.transpose(-1, -2) / (K.size(-1) ** 0.5)
 
-        if not cache:
+        if cache is None:
             T = K.size(1)
             mask = self.mask[:T, :T].byte()
             attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
