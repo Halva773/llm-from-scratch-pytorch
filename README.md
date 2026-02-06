@@ -1,5 +1,5 @@
 # llm-from-scratch-pytorch
-
+![Alt](https://repobeats.axiom.co/api/embed/6ca15cc238ef1f07307e0a19532198dee6c28f83.svg "Repobeats analytics image")
 
 ## Datasets
 - https://www.kaggle.com/datasets/grafstor/19-000-russian-poems (tokenizing)
