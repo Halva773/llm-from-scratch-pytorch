@@ -17,8 +17,8 @@ class PositionalEmbeddings(nn.Module):
         super().__init__()
         self.pos_embedding = nn.Embedding(max_seq_size, emb_size)
 
-    def forward(self, seq_len: int):
-        positions = torch.arange(0, seq_len, device=self.pos_embedding.weight.device)
+    def forward(self, seq_len: int, start_pos: int = 0):
+        positions = torch.arange(start_pos, start_pos+seq_len, device=self.pos_embedding.weight.device)
         return self.pos_embedding(positions)
         
 
