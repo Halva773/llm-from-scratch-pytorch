@@ -11,7 +11,7 @@ from pathlib import Path
 
 def get_model_cls(model_type: str):
     if model_type == "gpt1":
-        from model.gpt1.model import GPT2 as ModelCls
+        from model.gpt1.model import GPT as ModelCls
         return ModelCls
     if model_type == "gpt2":
         from model.gpt2.model import GPT2 as ModelCls

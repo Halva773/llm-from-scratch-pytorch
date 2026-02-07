@@ -32,7 +32,7 @@ class Decoder(nn.Module):
         return Oj
 
 
-class GPT2(nn.Module):
+class GPT(nn.Module):
     def __init__(self, 
                 vocab_size: int, 
                 max_seq_len: int, 
