@@ -205,7 +205,7 @@ class GPT2(nn.Module):
             for x, y in train_loader:
                 x = x.to(device, non_blocking=True)
                 y = y.to(device, non_blocking=True)
-                logits = self(x, use_cache=False)
+                logits, _ = self(x, use_cache=False)
                 targets = y
                 B, T, V = logits.shape
                 
@@ -224,7 +224,7 @@ class GPT2(nn.Module):
                 for x, y in valid_loader:
                     x = x.to(device, non_blocking=True)
                     y = y.to(device, non_blocking=True)
-                    logits = self(x, use_cache=False)
+                    logits, _ = self(x, use_cache=False)
                     targets = y
 
                     B, T, V = logits.shape

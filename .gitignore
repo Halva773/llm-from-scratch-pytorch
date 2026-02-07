@@ -26,4 +26,3 @@ temp
 *.pth
 
 *savepoints
-dataset/
