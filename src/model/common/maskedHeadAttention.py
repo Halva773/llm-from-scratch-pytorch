@@ -38,9 +38,9 @@ class HeadAttention(nn.Module):
 
         if cache is None:
             T = K.size(1)
-            mask = self.mask[:T, :T].byte()
+            mask = self.mask[:T, :T]
             attn_weights = attn_weights.masked_fill(~mask, float("-inf"))
-            
+             
         attn_weights = torch.softmax(attn_weights, dim=-1) 
         out = attn_weights @ V
         if use_cache:
