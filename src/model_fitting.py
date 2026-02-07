@@ -22,7 +22,8 @@ def get_model_cls(model_type: str):
 def get_text(filepath: str) -> str:
     data = pd.read_csv(filepath)
     data = data.dropna(subset=['text'])
-    return "\n".join(data.loc[:1000, 'text'])
+    return "\n".join(data['text'])
+    # return "\n".join(data.loc[:1000, 'text'])
 
 
 def print_text_with_time(text: str) -> None:
@@ -62,6 +63,7 @@ def main(**params):
     print_text_with_time(f"Tokenizer saved to: {tokenizer_path}")
 
     tokens_ids = tokenizer.encode(text)
+    print(tokens_ids[:200])
     print(f"Number of tokens: {len(tokens_ids)}")
 
     print_text_with_time("Preparing data loaders...")
