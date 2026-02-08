@@ -3,11 +3,12 @@ import torch
 
 
 class HeadAttention(nn.Module):
-    def __init__(self, emb_size: int, head_size: int, max_seq_len: int):
+    def __init__(self, emb_size: int, head_size: int, max_seq_len: int, rope = None):
         super().__init__()
         self.Wk = nn.Linear(emb_size, head_size)
         self.Wq = nn.Linear(emb_size, head_size)
         self.Wv = nn.Linear(emb_size, head_size)
+        self.rope = rope
 
         self.register_buffer(
             "mask",
@@ -27,6 +28,12 @@ class HeadAttention(nn.Module):
         Q = self.Wq(x) # Q = x ⋅ Wq.⊤ + b
         K = self.Wk(x)
         V = self.Wv(x)
+
+        if self.rope is not None:
+            seq_len = x.size(1)
+            start_pos = cache[0].size(1) if cache is not None else 0
+            Q = self.rope(Q, seq_len, start_pos)
+            K = self.rope(K, seq_len, start_pos)
 
         if cache is not None:
             key_cache, value_cache = cache
@@ -51,9 +58,9 @@ class HeadAttention(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: float = 0.1):
+    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, rope = None, dropout: float = 0.1):
         super().__init__()
-        self.heads = nn.ModuleList([HeadAttention(emb_size, head_size, max_seq_len) for _ in range(num_heads)])
+        self.heads = nn.ModuleList([HeadAttention(emb_size, head_size, max_seq_len, rope) for _ in range(num_heads)])
         self.linear = nn.Linear(num_heads * head_size, emb_size)
         self.dropout = nn.Dropout(dropout)
 
