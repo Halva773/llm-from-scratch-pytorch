@@ -10,16 +10,15 @@ except ModuleNotFoundError:  # pragma: no cover
 
 from model.common.embedings import TokenEmbeddings, PositionalEmbeddings
 from model.common.maskedHeadAttention import MultiHeadAttention
-from model.common.ffn import FeedForward
 from model.common.normalization import RMSNorm
-from model.common.activation import GELU
+from model.common.activation import SwiGLU
 
 
 class Decoder(nn.Module):
     def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: int = 0.1):
         super().__init__()
         self.mha = MultiHeadAttention(num_heads, emb_size, head_size, max_seq_len, dropout)
-        self.ff = FeedForward(emb_size=emb_size, dropout=dropout, ffn_norm=GELU())
+        self.ff = SwiGLU(emb_size=emb_size, dropout=dropout)
         self.first_norm = RMSNorm(emb_size)
         self.second_norm = RMSNorm(emb_size)
 
