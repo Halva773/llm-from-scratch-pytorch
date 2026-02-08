@@ -6,12 +6,15 @@ from model.common.bpe import BPE
 
 def get_model_cls(model_type: str):
     if model_type == "gpt1":
-        from model.gpt1.model import GPT2 as ModelCls
+        from model.gpt1.model import GPT as ModelCls
         return ModelCls
     if model_type == "gpt2":
         from model.gpt2.model import GPT2 as ModelCls
         return ModelCls
-    raise ValueError(f"Unknown --model_type: {model_type}. Expected: gpt1, gpt2")
+    if model_type == "llama":
+        from model.Llama.model import Llama as ModelCls
+        return ModelCls
+    raise ValueError(f"Unknown --model_type: {model_type}. Expected: gpt1, gpt2, llama")
 
 
 def main():
@@ -20,8 +23,8 @@ def main():
         "--model_type",
         type=str,
         default="gpt1",
-        choices=["gpt1", "gpt2"],
-        help="Which model implementation to use: gpt1 or gpt2.",
+        choices=["gpt1", "gpt2", "llama"],
+        help="Which model implementation to use: gpt1, gpt2, or llama.",
     )
     parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--tokenizer", type=str, required=True)

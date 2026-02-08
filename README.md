@@ -6,6 +6,7 @@
 - `src/model/common/` — общие компоненты (BPE, attention, FFN, embeddings, dataset).
 - `src/model/gpt1/model.py` — реализация модели `gpt1`.
 - `src/model/gpt2/model.py` — реализация модели `gpt2`.
+- `src/model/Llama/model.py` — реализация модели `llama`.
 - `src/model_fitting.py` — обучение (точка входа для тренировки).
 - `src/infer.py` — инференс/генерация (точка входа для текста).
 - `src/tokenizing.py` — вспомогательные функции/скрипт для подготовки токенизации (если используется).
@@ -31,7 +32,7 @@
 - Инференс: `python src/infer.py ...`
 
 В обоих скриптах добавлен параметр выбора реализации модели:
-- `--model_type gpt1|gpt2`
+- `--model_type gpt1|gpt2|llama`
 
 ## Обучение (model_fitting.py)
 
@@ -40,6 +41,7 @@
 Примеры (запуск из корня репозитория):
 - `python src/model_fitting.py --model_type gpt1 --device cuda --num_epoch 10 --save_dir savepoints --run_name gpt1_poems`
 - `python src/model_fitting.py --model_type gpt2 --device cuda --num_epoch 10 --save_dir savepoints --run_name gpt2_poems`
+- `python src/model_fitting.py --model_type llama --device cuda --num_epoch 10 --save_dir savepoints --run_name llama_poems`
 - `python src/model_fitting.py --model_type gpt1 --device cpu --num_epoch 50 --save_dir savepoints --run_name gpt_poems --headAttention 8 --emb_size 512 --dict_size 2000 --dropout 0.1 --learning_rate 0.00001 --batch_size 128 --seq_len 64`
 - `python src/model_fitting.py --model_type gpt2 --device cuda --layers 12 --headAttention 12 --emb_size 768 --dict_size 25000 --seq_len 256 --batch_size 16 --dropout 0.2 --learning_rate 2e-4 --num_epoch 10 --save_dir savepoints --run_name gpt2_poems_124m`
 - `python src/model_fitting.py --model_type gpt2 --layers 12 --headAttention 12 --emb_size 768 --dict_size 25000 --seq_len 128 --batch_size 16 --learning_rate 1e-4 --dropout 0.2 --num_epoch 3`
@@ -55,7 +57,8 @@
 Примеры:
 - `python src/infer.py --model_type gpt1 --device cuda --model savepoints/gpt1_poems.pth --tokenizer savepoints/bpe_40000.dill --prompt "Привет, мир!" --max_new_tokens 50`
 - `python src/infer.py --model_type gpt2 --device cuda --model savepoints/gpt2_poems.pth --tokenizer savepoints/bpe_40000.dill --prompt "Привет, мир!" --max_new_tokens 50 --do_sample --temperature 0.9 --top_k 50`
-- ` bpe_25000.dill --prompt "…" --max_new_tokens 120 --do_sample --temperature 0.9 --top_p 0.95 --top_k 50`
+- `python src/infer.py --model_type llama --device cuda --model savepoints/llama_poems.pth --tokenizer savepoints/bpe_40000.dill --prompt "Привет, мир!" --max_new_tokens 50 --do_sample --temperature 0.9 --top_p 0.95 --top_k 50`
+- `python src/infer.py --model_type gpt2 --device cuda --model savepoints/gpt2_poems.pth --tokenizer savepoints/bpe_25000.dill --prompt "…" --max_new_tokens 120 --do_sample --temperature 0.9 --top_p 0.95 --top_k 50`
 
 
 Подсказка: `dict_size` токенайзера должен совпадать с `vocab_size` модели, иначе чекпойнт не загрузится.
