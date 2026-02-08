@@ -8,16 +8,16 @@ except ModuleNotFoundError:  # pragma: no cover
     def tqdm(x, **kwargs):
         return x
 
-from model.common.embedings import TokenEmbeddings, PositionalEmbeddings
+from model.common.embedings import TokenEmbeddings, RoPE
 from model.common.maskedHeadAttention import MultiHeadAttention
 from model.common.normalization import RMSNorm
 from model.common.activation import SwiGLU
 
 
 class Decoder(nn.Module):
-    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, dropout: int = 0.1):
+    def __init__(self, num_heads: int, emb_size: int, head_size: int, max_seq_len: int, rope: RoPE, dropout: int = 0.1):
         super().__init__()
-        self.mha = MultiHeadAttention(num_heads, emb_size, head_size, max_seq_len, dropout)
+        self.mha = MultiHeadAttention(num_heads, emb_size, head_size, max_seq_len, rope, dropout)
         self.ff = SwiGLU(emb_size=emb_size, dropout=dropout)
         self.first_norm = RMSNorm(emb_size)
         self.second_norm = RMSNorm(emb_size)
@@ -34,7 +34,7 @@ class Decoder(nn.Module):
 
 
 
-class GPT2(nn.Module):
+class Llama(nn.Module):
     def __init__(self, 
                 vocab_size: int, 
                 max_seq_len: int, 
@@ -54,12 +54,12 @@ class GPT2(nn.Module):
         self.num_layers = num_layers
         self.dropout_float = dropout
         self.device = device
+        self.rope = RoPE(head_size, max_seq_len)
         
         self.tokenEmbedings = TokenEmbeddings(self.vocab_size, self.emb_size)
-        self.positionalEmbeddings = PositionalEmbeddings(self.max_seq_len, self.emb_size)
         self.dropout = nn.Dropout(self.dropout_float)
         self.decoders = nn.ModuleList([
-                Decoder(self.num_heads, self.emb_size, self.head_size, self.max_seq_len, self.dropout_float) 
+                Decoder(self.num_heads, self.emb_size, self.head_size, self.max_seq_len, self.rope, self.dropout_float) 
                 for _ in range(self.num_layers)
             ])
         self.linear = nn.Linear(self.emb_size, self.vocab_size)
@@ -69,16 +69,7 @@ class GPT2(nn.Module):
         B, T = x.shape
         
         tokenEmbeddings = self.tokenEmbedings(x)
-        if cache is None:
-            posEmbeddings = self.positionalEmbeddings(seq_len=T, start_pos=0)
-        else:
-            # берем K первого слоя, первой головы
-            prev_len = cache[0][0][0].shape[1]
-            posEmbeddings = self.positionalEmbeddings(seq_len=1, start_pos=prev_len)
-
-
-        embeddings = tokenEmbeddings + posEmbeddings
-        out = self.dropout(embeddings)
+        out = self.dropout(tokenEmbeddings)
 
         new_cache = [] if use_cache else None
         for i, decoder in enumerate(self.decoders):
