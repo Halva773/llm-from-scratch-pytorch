@@ -11,8 +11,8 @@ except ModuleNotFoundError:  # pragma: no cover
 from model.common.embedings import TokenEmbeddings, PositionalEmbeddings
 from model.common.maskedHeadAttention import MultiHeadAttention
 from model.common.ffn import FeedForward
+from model.common.normalization import RMSNorm
 from model.common.activation import GELU
-
 
 
 class Decoder(nn.Module):
@@ -20,8 +20,8 @@ class Decoder(nn.Module):
         super().__init__()
         self.mha = MultiHeadAttention(num_heads, emb_size, head_size, max_seq_len, dropout)
         self.ff = FeedForward(emb_size=emb_size, dropout=dropout, ffn_norm=GELU())
-        self.first_norm = nn.LayerNorm(emb_size)
-        self.second_norm = nn.LayerNorm(emb_size)
+        self.first_norm = RMSNorm(emb_size)
+        self.second_norm = RMSNorm(emb_size)
 
 
     def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
@@ -64,7 +64,7 @@ class GPT2(nn.Module):
                 for _ in range(self.num_layers)
             ])
         self.linear = nn.Linear(self.emb_size, self.vocab_size)
-        self.ln = nn.LayerNorm(self.emb_size)
+        self.ln = RMSNorm(self.emb_size)
 
     def forward(self, x: torch.Tensor, use_cache: bool = True, cache: list = None):
         B, T = x.shape
