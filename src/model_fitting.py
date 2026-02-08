@@ -1,3 +1,4 @@
+import pandas as pd
 from torch.utils.data import DataLoader
 import torch
 from datetime import datetime
@@ -15,20 +16,13 @@ def get_model_cls(model_type: str):
     if model_type == "gpt2":
         from model.gpt2.model import GPT2 as ModelCls
         return ModelCls
-    if model_type == "llama":
+    if model_type == "Llama":
         from model.Llama.model import Llama as ModelCls
         return ModelCls
-    raise ValueError(f"Unknown --model_type: {model_type}. Expected: gpt1, gpt2, llama")
+    raise ValueError(f"Unknown --model_type: {model_type}. Expected: gpt1, gpt2")
 
 
 def get_text(filepath: str) -> str:
-    try:
-        import pandas as pd
-    except ModuleNotFoundError as e:
-        raise ModuleNotFoundError(
-            "pandas is required to load --dataset_csv. Install it (e.g. `pip install pandas`) "
-            "or change get_text() to use a different loader."
-        ) from e
     data = pd.read_csv(filepath)
     data = data.dropna(subset=['text'])
     return "\n".join(data['text'])
@@ -138,8 +132,8 @@ if __name__ == "__main__":
         "--model_type",
         type=str,
         default="gpt1",
-        choices=["gpt1", "gpt2", "llama"],
-        help="Which model implementation to train: gpt1, gpt2, or llama.",
+        choices=["gpt1", "gpt2"],
+        help="Which model implementation to train: gpt1 or gpt2.",
     )
     parser.add_argument("--layers", type=int, default=12)
     parser.add_argument("--headAttention", type=int, default=12)
